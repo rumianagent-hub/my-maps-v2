@@ -43,27 +43,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, loadProfile]);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadProfile(session.user).then((p) => {
-          setProfile(p);
+    let mounted = true;
+
+    // Get initial session with timeout to prevent infinite loading
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!mounted) return;
+        if (error) {
+          console.error("getSession error:", error);
           setLoading(false);
-        });
-      } else {
+          return;
+        }
+        if (session?.user) {
+          setUser(session.user);
+          const p = await loadProfile(session.user);
+          if (mounted) {
+            setProfile(p);
+            setLoading(false);
+          }
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Auth init failed:", err);
+        if (mounted) setLoading(false);
+      }
+    };
+
+    // Safety timeout — if auth takes more than 5s, stop loading
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        console.warn("Auth init timed out, proceeding without session");
         setLoading(false);
       }
-    });
+    }, 5000);
+
+    initAuth().finally(() => clearTimeout(timeout));
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
         const u = session?.user ?? null;
         setUser(u);
         if (u) {
           const p = await loadProfile(u);
-          setProfile(p);
+          if (mounted) setProfile(p);
         } else {
           setProfile(null);
         }
@@ -71,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [loadProfile]);
 
   // Redirect to setup if not onboarded
