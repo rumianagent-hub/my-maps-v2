@@ -45,43 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session with timeout to prevent infinite loading
-    const initAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (error) {
-          console.error("getSession error:", error);
-          setLoading(false);
-          return;
-        }
-        if (session?.user) {
-          setUser(session.user);
-          const p = await loadProfile(session.user);
-          if (mounted) {
-            setProfile(p);
-            setLoading(false);
-          }
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Auth init failed:", err);
-        if (mounted) setLoading(false);
-      }
-    };
-
-    // Safety timeout — if auth takes more than 5s, stop loading
-    const timeout = setTimeout(() => {
-      if (mounted) {
-        console.warn("Auth init timed out, proceeding without session");
-        setLoading(false);
-      }
-    }, 5000);
-
-    initAuth().finally(() => clearTimeout(timeout));
-
-    // Listen for changes
+    // Use onAuthStateChange as the sole auth source.
+    // Supabase v2 fires INITIAL_SESSION on subscribe, handling token refresh internally.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -93,11 +58,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
         }
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     );
 
-    return () => { mounted = false; subscription.unsubscribe(); };
+    // Safety timeout — if Supabase never fires (e.g. network down), unblock the UI
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn("Auth timed out, proceeding without session");
+        setLoading(false);
+      }
+    }, 3000);
+
+    return () => { mounted = false; clearTimeout(timeout); subscription.unsubscribe(); };
   }, [loadProfile]);
 
   // Redirect to setup if not onboarded
