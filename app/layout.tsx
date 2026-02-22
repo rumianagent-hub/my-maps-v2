@@ -6,6 +6,7 @@ import { QueryProvider } from "@/lib/query-provider";
 import Navbar from "@/components/Navbar";
 import { ToastProvider } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { BfcacheHandler } from "@/components/BfcacheHandler";
 import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} antialiased grain`}>
+        <BfcacheHandler />
         <ErrorBoundary>
           <QueryProvider>
             <AuthProvider>
