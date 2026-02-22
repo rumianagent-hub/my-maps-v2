@@ -5,3 +5,6 @@ out
 .env.*
 .env.local
 .supabase
+
+.open-next
+.dev.vars

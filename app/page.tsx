@@ -17,23 +17,7 @@ function HomeFeed() {
 
   const posts = tab === "following" ? (feedPosts ?? []) : (forYouPosts ?? []);
   const loading = tab === "following" ? feedLoading : forYouLoading;
-
-  // Track if this is truly the first load (no data has ever been shown)
-  const [hasEverLoaded, setHasEverLoaded] = useState(false);
-  useEffect(() => {
-    if (posts.length > 0) setHasEverLoaded(true);
-  }, [posts]);
-
-  // Only show skeleton on the very first load ever, and only after a delay
-  // to avoid flash on fast cache reads
-  const [showSkeletonDelayed, setShowSkeletonDelayed] = useState(false);
-  useEffect(() => {
-    if (!loading || hasEverLoaded) { setShowSkeletonDelayed(false); return; }
-    const t = setTimeout(() => setShowSkeletonDelayed(true), 300);
-    return () => clearTimeout(t);
-  }, [loading, hasEverLoaded]);
-
-  const showSkeleton = showSkeletonDelayed && !hasEverLoaded && posts.length === 0;
+  const showSkeleton = loading && posts.length === 0;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
