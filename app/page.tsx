@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { useState, useRef, useEffect } from "react";
 import { useExplorePosts, useFeed } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import PostCard from "@/components/PostCard";
 import { SkeletonCard, SkeletonPostList } from "@/components/Skeleton";
 import { FiMap, FiCamera, FiShare2, FiSearch, FiCompass } from "react-icons/fi";
@@ -12,13 +13,25 @@ function HomeFeed() {
   const { profile } = useAuth();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
 
-  const { data: forYouPosts = [], isLoading: forYouLoading } = useExplorePosts(0);
-  const { data: feedPosts = [], isLoading: feedLoading } = useFeed();
+  const qc = useQueryClient();
+  const { data: forYouPosts, isLoading: forYouLoading, isFetching: forYouFetching } = useExplorePosts(0);
+  const { data: feedPosts, isLoading: feedLoading, isFetching: feedFetching } = useFeed();
 
-  const posts = tab === "following" ? feedPosts : forYouPosts;
+  const posts = tab === "following" ? (feedPosts ?? []) : (forYouPosts ?? []);
   const loading = tab === "following" ? feedLoading : forYouLoading;
-  // Only show skeleton on first load (no cached data)
-  const showSkeleton = loading && posts.length === 0;
+  const hasData = posts.length > 0;
+  // Never show skeleton if we have any cached data
+  const showSkeleton = loading && !hasData;
+
+  // Safety: if stuck loading for 5s, force invalidate
+  useEffect(() => {
+    if (!showSkeleton) return;
+    const t = setTimeout(() => {
+      qc.invalidateQueries({ queryKey: ["explore"] });
+      qc.invalidateQueries({ queryKey: ["feed"] });
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [showSkeleton, qc]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
