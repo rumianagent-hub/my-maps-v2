@@ -3,7 +3,6 @@
 import { useAuth } from "@/lib/auth-context";
 import { useState, useRef, useEffect } from "react";
 import { useExplorePosts, useFeed } from "@/lib/hooks";
-import { useQueryClient } from "@tanstack/react-query";
 import PostCard from "@/components/PostCard";
 import { SkeletonCard, SkeletonPostList } from "@/components/Skeleton";
 import { FiMap, FiCamera, FiShare2, FiSearch, FiCompass } from "react-icons/fi";
@@ -13,25 +12,28 @@ function HomeFeed() {
   const { profile } = useAuth();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
 
-  const qc = useQueryClient();
-  const { data: forYouPosts, isLoading: forYouLoading, isFetching: forYouFetching } = useExplorePosts(0);
-  const { data: feedPosts, isLoading: feedLoading, isFetching: feedFetching } = useFeed();
+  const { data: forYouPosts, isLoading: forYouLoading } = useExplorePosts(0);
+  const { data: feedPosts, isLoading: feedLoading } = useFeed();
 
   const posts = tab === "following" ? (feedPosts ?? []) : (forYouPosts ?? []);
   const loading = tab === "following" ? feedLoading : forYouLoading;
-  const hasData = posts.length > 0;
-  // Never show skeleton if we have any cached data
-  const showSkeleton = loading && !hasData;
 
-  // Safety: if stuck loading for 5s, force invalidate
+  // Track if this is truly the first load (no data has ever been shown)
+  const [hasEverLoaded, setHasEverLoaded] = useState(false);
   useEffect(() => {
-    if (!showSkeleton) return;
-    const t = setTimeout(() => {
-      qc.invalidateQueries({ queryKey: ["explore"] });
-      qc.invalidateQueries({ queryKey: ["feed"] });
-    }, 5000);
+    if (posts.length > 0) setHasEverLoaded(true);
+  }, [posts]);
+
+  // Only show skeleton on the very first load ever, and only after a delay
+  // to avoid flash on fast cache reads
+  const [showSkeletonDelayed, setShowSkeletonDelayed] = useState(false);
+  useEffect(() => {
+    if (!loading || hasEverLoaded) { setShowSkeletonDelayed(false); return; }
+    const t = setTimeout(() => setShowSkeletonDelayed(true), 300);
     return () => clearTimeout(t);
-  }, [showSkeleton, qc]);
+  }, [loading, hasEverLoaded]);
+
+  const showSkeleton = showSkeletonDelayed && !hasEverLoaded && posts.length === 0;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
