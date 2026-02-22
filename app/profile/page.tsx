@@ -10,7 +10,7 @@ import { SkeletonProfile } from "@/components/Skeleton";
 import Link from "next/link";
 
 export default function ProfilePage() {
-  const { user, profile, ready, loading, updateProfile, checkUsernameAvailable } = useAuth();
+  const { user, profile, ready, loading, updateProfile, checkUsernameAvailable, refreshProfile } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -40,7 +40,17 @@ export default function ProfilePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(`${window.location.origin}/user?u=${profile?.username}`); toast("Profile link copied!"); };
 
-  if (!ready || loading || !user || !profile) return <SkeletonProfile />;
+  // If profile is null after auth resolves, retry loading it
+  useEffect(() => {
+    if (ready && user && !profile && !loading) {
+      // Profile failed to load — retry after a short delay
+      const t = setTimeout(() => refreshProfile(), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [ready, user, profile, loading, refreshProfile]);
+
+  if (!user && ready) { return null; }
+  if (!user || !profile) return <SkeletonProfile />;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
