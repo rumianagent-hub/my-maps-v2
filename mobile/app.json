@@ -28,18 +28,44 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#09090b"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
       [
         "expo-location",
-        { "locationWhenInUsePermission": "MyMaps uses your location to show nearby restaurants." }
+        {
+          "locationWhenInUsePermission": "MyMaps uses your location to show nearby restaurants."
+        }
       ],
       [
         "expo-image-picker",
-        { "photosPermission": "MyMaps needs photo access to upload restaurant photos.", "cameraPermission": "MyMaps needs camera access to take restaurant photos." }
+        {
+          "photosPermission": "MyMaps needs photo access to upload restaurant photos.",
+          "cameraPermission": "MyMaps needs camera access to take restaurant photos."
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e3cea478-f9c9-4ad0-8541-187a06df2c7f"
+      }
+    },
+    "owner": "rumianagent",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e3cea478-f9c9-4ad0-8541-187a06df2c7f"
+    }
   }
 }
