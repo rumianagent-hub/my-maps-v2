@@ -12,7 +12,7 @@ import { FiMapPin, FiStar, FiCalendar, FiArrowLeft, FiShare, FiEdit2, FiTrash2 }
 import { format } from "date-fns";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 function PostSkeleton() {
@@ -35,9 +35,16 @@ function PostContent() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: post, isLoading, isError } = usePost(id);
+  const { data: post, isLoading, isError, refetch } = usePost(id);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Safety: if loading for >4s, force refetch
+  useEffect(() => {
+    if (!isLoading || !id) return;
+    const t = setTimeout(() => { console.warn("Post load timeout, refetching"); refetch(); }, 4000);
+    return () => clearTimeout(t);
+  }, [isLoading, id, refetch]);
 
   const isOwner = user && post && user.id === post.user_id;
 

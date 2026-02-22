@@ -142,6 +142,8 @@ export function usePost(id: string | null) {
       return data as PostWithAuthor;
     },
     enabled: !!id,
+    retry: 2,
+    staleTime: 60_000,
   });
 }
 
