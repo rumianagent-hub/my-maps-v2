@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
   Image, Alert, ActivityIndicator, Dimensions, FlatList, KeyboardAvoidingView, Platform,
@@ -40,6 +40,8 @@ export default function AddScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const scrollRef = useRef<ScrollView>(null);
 
   // Place search
   const [placeQuery, setPlaceQuery] = useState("");
@@ -130,11 +132,11 @@ export default function AddScreen() {
 
     const fileName = `${user!.id}/${Date.now()}_${index}.jpg`;
     const { error } = await supabase.storage
-      .from("post-photos")
+      .from("posts")
       .upload(fileName, decode(base64), { contentType: "image/jpeg" });
     if (error) throw error;
 
-    const { data } = supabase.storage.from("post-photos").getPublicUrl(fileName);
+    const { data } = supabase.storage.from("posts").getPublicUrl(fileName);
     return data.publicUrl;
   };
 
@@ -245,10 +247,12 @@ export default function AddScreen() {
         )}
 
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {/* Step 0: Photos */}
           {step === 0 && (
@@ -361,16 +365,6 @@ export default function AddScreen() {
                 ))}
               </View>
 
-              <Text style={styles.label}>Caption</Text>
-              <TextInput
-                style={[styles.input, { height: 100, textAlignVertical: "top" }]}
-                value={caption}
-                onChangeText={setCaption}
-                placeholder="What did you think?"
-                placeholderTextColor={colors.textPlaceholder}
-                multiline
-              />
-
               <Text style={styles.label}>Tags</Text>
               <View style={styles.tagGrid}>
                 {SUGGESTED_TAGS.map((tag) => (
@@ -386,6 +380,19 @@ export default function AddScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              <Text style={styles.label}>Caption</Text>
+              <TextInput
+                style={[styles.input, { height: 80, textAlignVertical: "top" }]}
+                value={caption}
+                onChangeText={setCaption}
+                placeholder="What did you think?"
+                placeholderTextColor={colors.textPlaceholder}
+                multiline
+                onFocus={() => {
+                  setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+                }}
+              />
             </View>
           )}
         </ScrollView>
@@ -457,7 +464,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.indigo,
     borderRadius: 2,
   },
-  scroll: { padding: spacing.md, paddingBottom: 40 },
+  scroll: { padding: spacing.md, paddingBottom: 120 },
   stepTitle: { fontSize: fonts.sizes.title2, fontWeight: fonts.weights.bold, color: colors.text, marginBottom: 4 },
   stepSubtitle: { color: colors.textMuted, fontSize: fonts.sizes.subheadline, marginBottom: 20 },
   photoPickerBtn: {
@@ -548,7 +555,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
-    paddingBottom: 24,
+    paddingBottom: 90,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.separator,
   },

@@ -34,10 +34,23 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<MapFilter>("all");
   const [selectedPost, setSelectedPost] = useState<PostWithAuthor | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     loadPosts();
   }, [user, filter]);
+
+  // Get user location on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const loc = await Location.getCurrentPositionAsync({});
+        setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      } catch (e) {}
+    })();
+  }, []);
 
   const loadPosts = async () => {
     setLoading(true);
@@ -99,11 +112,21 @@ export default function MapScreen() {
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
+        region={userLocation ? {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.08,
+          longitudeDelta: 0.08,
+        } : undefined}
         initialRegion={{
           latitude: validPosts[0]?.lat || 43.65,
           longitude: validPosts[0]?.lng || -79.38,
           latitudeDelta: 0.5,
           longitudeDelta: 0.5,
+        }}
+        onRegionChangeComplete={() => {
+          // Stop controlling region after user moves the map
+          if (userLocation) setUserLocation(null);
         }}
         userInterfaceStyle="dark"
         customMapStyle={Platform.OS === "android" ? DARK_MAP_STYLE : undefined}
@@ -117,11 +140,20 @@ export default function MapScreen() {
             coordinate={{ latitude: post.lat, longitude: post.lng }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setSelectedPost(post);
+              router.push(`/post?id=${post.id}`);
             }}
           >
             <View style={styles.markerContainer}>
-              <Text style={styles.markerEmoji}>📍</Text>
+              {post.photo_urls.length > 0 ? (
+                <View style={styles.markerPhotoWrap}>
+                  <Image source={{ uri: post.photo_urls[0] }} style={styles.markerPhoto} />
+                </View>
+              ) : (
+                <View style={styles.markerPhotoWrap}>
+                  <Text style={{ fontSize: 16 }}>🍽️</Text>
+                </View>
+              )}
+              <View style={styles.markerArrow} />
             </View>
           </Marker>
         ))}
@@ -243,7 +275,38 @@ const styles = StyleSheet.create({
   markerContainer: {
     alignItems: "center",
   },
-  markerEmoji: { fontSize: 24 },
+  markerPhotoWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
+    borderColor: colors.indigo,
+    backgroundColor: colors.bgCard,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  markerPhoto: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  markerArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: colors.indigo,
+    marginTop: -1,
+  },
   selectedCard: {
     position: "absolute",
     bottom: 100,

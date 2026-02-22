@@ -185,11 +185,24 @@ export default function ProfileScreen() {
     </View>
   );
 
+  const emptyComponent = loading ? (
+    <ActivityIndicator size="large" color={colors.indigo} style={{ marginTop: 40 }} />
+  ) : (
+    <View style={styles.emptyState}>
+      <Text style={{ fontSize: 48, marginBottom: 12 }}>🍽️</Text>
+      <Text style={styles.emptyText}>No posts yet — start logging!</Text>
+    </View>
+  );
+
+  const refreshControl = (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.indigo} />
+  );
+
   if (segIndex === 0) {
-    // Grid view
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <FlatList
+          key="grid"
           data={posts}
           keyExtractor={(item) => item.id}
           numColumns={3}
@@ -197,47 +210,25 @@ export default function ProfileScreen() {
           ListHeaderComponent={header}
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.indigo} />
-          }
-          ListEmptyComponent={
-            loading ? (
-              <ActivityIndicator size="large" color={colors.indigo} style={{ marginTop: 40 }} />
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={{ fontSize: 48, marginBottom: 12 }}>🍽️</Text>
-                <Text style={styles.emptyText}>No posts yet — start logging!</Text>
-              </View>
-            )
-          }
+          refreshControl={refreshControl}
+          ListEmptyComponent={emptyComponent}
         />
       </SafeAreaView>
     );
   }
 
-  // List view
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <FlatList
+        key="list"
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <PostCard post={item} />}
         ListHeaderComponent={header}
         contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.indigo} />
-        }
-        ListEmptyComponent={
-          loading ? (
-            <ActivityIndicator size="large" color={colors.indigo} style={{ marginTop: 40 }} />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={{ fontSize: 48, marginBottom: 12 }}>🍽️</Text>
-              <Text style={styles.emptyText}>No posts yet — start logging!</Text>
-            </View>
-          )
-        }
+        refreshControl={refreshControl}
+        ListEmptyComponent={emptyComponent}
       />
     </SafeAreaView>
   );

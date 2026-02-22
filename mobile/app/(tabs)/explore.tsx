@@ -249,6 +249,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   tabPills: {
+    maxHeight: 44,
     paddingBottom: spacing.sm,
   },
   pill: {
@@ -256,6 +257,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: radii.full,
     backgroundColor: "rgba(118,118,128,0.24)",
+    height: 34,
+    justifyContent: "center" as const,
   },
   pillActive: {
     backgroundColor: colors.indigo,
