@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useUserByUsername } from "@/lib/hooks";
 import ProfileTabs from "@/components/ProfileTabs";
 import FollowButton from "@/components/FollowButton";
+import { SkeletonProfile } from "@/components/Skeleton";
 import { FiMapPin } from "react-icons/fi";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -11,10 +12,16 @@ import Link from "next/link";
 function UserContent() {
   const searchParams = useSearchParams();
   const username = searchParams.get("u");
-  const { data: profile, isLoading } = useUserByUsername(username);
+  const { data: profile, isLoading, isError } = useUserByUsername(username);
 
-  if (isLoading) return <div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
-  if (!profile) return <div className="flex flex-col items-center justify-center min-h-screen text-zinc-500"><p>User not found</p><Link href="/" className="text-indigo-400 mt-2">Go home</Link></div>;
+  if (isLoading) return <SkeletonProfile />;
+  if (isError || !profile) return (
+    <div className="flex flex-col items-center justify-center min-h-screen text-zinc-500">
+      <div className="text-5xl mb-4">🔍</div>
+      <p className="text-lg mb-2">User not found</p>
+      <Link href="/" className="text-indigo-400 hover:text-indigo-300 mt-2">Go home</Link>
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
@@ -39,5 +46,5 @@ function UserContent() {
 }
 
 export default function UserPage() {
-  return <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><UserContent /></Suspense>;
+  return <Suspense fallback={<SkeletonProfile />}><UserContent /></Suspense>;
 }

@@ -10,9 +10,23 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const SUGGESTED_TAGS = [
   "🍕 pizza", "🍣 sushi", "🍔 burgers", "🌮 tacos", "🍜 noodles", "🥗 healthy",
-  "☕ brunch", "🍷 wine", "🍺 beer", "🥂 date-night", "👨‍👩‍👧 family", "💰 budget",
+  "☕ brunch", "🍷 wine", "🍺 beer", "🥂 date-night", "👨👩👧 family", "💰 budget",
   "✨ fine-dining", "🔥 must-try", "🌱 vegan", "🍝 pasta", "🥘 curry", "🍰 dessert",
 ];
+
+function EditSkeleton() {
+  return (
+    <div className="max-w-lg mx-auto px-4 pt-20 pb-8">
+      <div className="shimmer h-8 w-24 rounded-xl mb-6" />
+      <div className="shimmer h-40 rounded-2xl mb-6" />
+      <div className="space-y-6">
+        <div className="shimmer h-12 rounded-xl" />
+        <div className="shimmer h-24 rounded-xl" />
+        <div className="shimmer h-16 rounded-xl" />
+      </div>
+    </div>
+  );
+}
 
 function EditPostContent() {
   const searchParams = useSearchParams();
@@ -20,7 +34,7 @@ function EditPostContent() {
   const qc = useQueryClient();
   const id = searchParams.get("id");
   const { user } = useAuth();
-  const { data: post, isLoading } = usePost(id);
+  const { data: post, isLoading, isError } = usePost(id);
   const [saving, setSaving] = useState(false);
   const [caption, setCaption] = useState("");
   const [rating, setRating] = useState(0);
@@ -46,7 +60,9 @@ function EditPostContent() {
     setSaving(true);
     try {
       await supabase.from("posts").update({ caption, rating, tags }).eq("id", id);
-      qc.invalidateQueries({ queryKey: ["post", id] });
+      // Optimistic: update cache directly
+      qc.setQueryData(["post", id], (old: any) => old ? { ...old, caption, rating, tags } : old);
+      qc.invalidateQueries({ queryKey: ["user-posts", user?.id] });
       router.push(`/post?id=${id}`);
     } catch (err) {
       console.error("Failed to update:", err);
@@ -54,8 +70,8 @@ function EditPostContent() {
     } finally { setSaving(false); }
   };
 
-  if (isLoading) return <div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
-  if (!post) return <div className="flex flex-col items-center justify-center min-h-screen text-zinc-500"><p>Post not found</p></div>;
+  if (isLoading) return <EditSkeleton />;
+  if (isError || !post) return <div className="flex flex-col items-center justify-center min-h-screen text-zinc-500"><p>Post not found</p></div>;
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-20 pb-8 animate-fade-in">
@@ -67,7 +83,7 @@ function EditPostContent() {
 
       {post.photo_urls[0] && (
         <div className="relative rounded-2xl overflow-hidden border border-white/[0.06] mb-6">
-          <img src={post.photo_urls[0]} alt={post.place_name} className="w-full h-40 object-cover" />
+          <img src={post.photo_urls[0]} alt={post.place_name} className="w-full h-40 object-cover" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
           <div className="absolute bottom-3 left-3"><div className="font-semibold text-white text-sm">{post.place_name}</div><div className="text-white/60 text-xs">{post.city || post.place_address}</div></div>
         </div>
@@ -115,5 +131,5 @@ function EditPostContent() {
 }
 
 export default function EditPostPage() {
-  return <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><EditPostContent /></Suspense>;
+  return <Suspense fallback={<EditSkeleton />}><EditPostContent /></Suspense>;
 }

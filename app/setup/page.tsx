@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FiCheck, FiX, FiLoader, FiMap } from "react-icons/fi";
 
 export default function SetupPage() {
-  const { user, profile, loading, updateProfile, checkUsernameAvailable } = useAuth();
+  const { user, profile, ready, loading, updateProfile, checkUsernameAvailable } = useAuth();
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -16,7 +16,12 @@ export default function SetupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => { if (!loading && !user) router.push("/"); if (profile?.onboarded) router.push("/"); if (profile?.display_name) setDisplayName(profile.display_name); }, [user, profile, loading, router]);
+  useEffect(() => {
+    if (!ready) return;
+    if (!user) router.push("/");
+    if (profile?.onboarded) router.push("/");
+    if (profile?.display_name) setDisplayName(profile.display_name);
+  }, [user, profile, ready, router]);
 
   useEffect(() => {
     if (username.length < 3) { setAvailable(null); return; }
@@ -34,7 +39,11 @@ export default function SetupPage() {
     catch { setError("Failed to save."); } finally { setSubmitting(false); }
   };
 
-  if (loading || !user) return <div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!ready || loading || !user) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-20 h-20 rounded-2xl shimmer" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative">

@@ -4,14 +4,36 @@ import type { PostWithAuthor } from "@/lib/types";
 import { FiMapPin, FiStar, FiCalendar } from "react-icons/fi";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
+import { usePrefetch } from "@/lib/hooks";
 import PhotoCarousel from "./PhotoCarousel";
+import { useCallback } from "react";
 
 export default function PostCard({ post, showAuthor = false }: { post: PostWithAuthor; showAuthor?: boolean }) {
   const router = useRouter();
+  const { prefetchPost, prefetchPlace, prefetchUser } = usePrefetch();
+
+  const handlePostHover = useCallback(() => {
+    prefetchPost(post.id);
+  }, [post.id, prefetchPost]);
+
+  const handlePlaceHover = useCallback(() => {
+    prefetchPlace(post.place_id);
+  }, [post.place_id, prefetchPlace]);
+
+  const handleAuthorHover = useCallback(() => {
+    if (post.author_username) prefetchUser(post.author_username);
+  }, [post.author_username, prefetchUser]);
 
   const authorOverlay = showAuthor && post.author_name ? (
     <div className="absolute bottom-3 left-3 flex items-center gap-2 z-10">
-      {post.author_photo && <img src={post.author_photo} alt="" className="w-6 h-6 rounded-full ring-2 ring-black/30" />}
+      {post.author_photo && (
+        <img
+          src={post.author_photo}
+          alt=""
+          className="w-6 h-6 rounded-full ring-2 ring-black/30"
+          loading="lazy"
+        />
+      )}
       <span className="text-xs text-white/80 font-medium">@{post.author_username}</span>
     </div>
   ) : null;
@@ -31,20 +53,28 @@ export default function PostCard({ post, showAuthor = false }: { post: PostWithA
   );
 
   return (
-    <div className="block group">
+    <div className="block group" onMouseEnter={handlePostHover}>
       <div className="bg-[var(--bg-card)] rounded-2xl overflow-hidden border border-white/[0.06] card-hover">
         {post.photo_urls.length > 0 && (
           <PhotoCarousel photos={post.photo_urls} alt={post.place_name} overlay={overlay} />
         )}
         <div className="p-4 cursor-pointer" onClick={() => router.push(`/post?id=${post.id}`)}>
           {!post.photo_urls.length && showAuthor && post.author_name && (
-            <div className="flex items-center gap-2 mb-2">
-              {post.author_photo && <img src={post.author_photo} alt="" className="w-5 h-5 rounded-full" />}
+            <div
+              className="flex items-center gap-2 mb-2"
+              onMouseEnter={handleAuthorHover}
+            >
+              {post.author_photo && (
+                <img src={post.author_photo} alt="" className="w-5 h-5 rounded-full" loading="lazy" />
+              )}
               <span className="text-xs text-zinc-500">@{post.author_username}</span>
             </div>
           )}
-          <h3 className="font-semibold text-zinc-100 text-base truncate hover:text-indigo-400 transition-colors cursor-pointer"
-            onClick={(e) => { e.stopPropagation(); router.push(`/place?id=${post.place_id}`); }}>
+          <h3
+            className="font-semibold text-zinc-100 text-base truncate hover:text-indigo-400 transition-colors cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); router.push(`/place?id=${post.place_id}`); }}
+            onMouseEnter={handlePlaceHover}
+          >
             {post.place_name}
           </h3>
           <div className="flex items-center gap-1.5 text-zinc-500 text-sm mt-1">

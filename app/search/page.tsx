@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearch, useExplorePosts, useAllUsers, useAllTags } from "@/lib/hooks";
 import PostCard from "@/components/PostCard";
+import { SkeletonPostGrid, SkeletonUserRow } from "@/components/Skeleton";
 import { FiSearch, FiX, FiUser, FiMapPin, FiHash } from "react-icons/fi";
 import Link from "next/link";
 
@@ -11,16 +12,15 @@ type Tab = "all" | "restaurants" | "people" | "tags";
 export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState<Tab>("all");
-  const { data: searchResults } = useSearch(searchQuery);
+  const { data: searchResults, isLoading: searchLoading } = useSearch(searchQuery);
   const { data: defaultPosts = [] } = useExplorePosts(0);
-  const { data: allUsers = [] } = useAllUsers();
+  const { data: allUsers = [], isLoading: usersLoading } = useAllUsers();
   const { data: allTags = [] } = useAllTags();
 
   const searched = searchQuery.trim().length >= 2;
   const posts = searched ? (searchResults?.posts || []) : defaultPosts.slice(0, 12);
   const users = searched ? (searchResults?.users || []) : allUsers;
 
-  // Tags: from search results or from all posts
   const tagCounts = new Map<string, number>();
   if (searched) {
     posts.forEach((p) => p.tags?.forEach((t) => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)));
@@ -36,13 +36,15 @@ export default function SearchPage() {
     { id: "tags", label: "Tags", icon: <FiHash size={14} /> },
   ];
 
+  const showPeopleSkeleton = !searched && usersLoading && users.length === 0 && (tab === "all" || tab === "people");
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
       <div className="relative mb-5">
         <FiSearch size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
         <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search restaurants, people, tags..." autoFocus
           className="w-full pl-11 pr-10 py-3.5 bg-white/[0.03] border border-white/[0.06] rounded-xl text-zinc-100 placeholder:text-zinc-600 text-sm" />
-        {searchQuery && <button onClick={() => { setSearchQuery(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/[0.06] rounded-lg"><FiX size={16} className="text-zinc-500" /></button>}
+        {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/[0.06] rounded-lg"><FiX size={16} className="text-zinc-500" /></button>}
       </div>
       <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
         {tabs.map((t) => (
@@ -54,6 +56,9 @@ export default function SearchPage() {
       </div>
 
       {/* PEOPLE */}
+      {showPeopleSkeleton && (
+        <div className="mb-8 space-y-2">{[1, 2, 3].map((i) => <SkeletonUserRow key={i} />)}</div>
+      )}
       {(tab === "all" || tab === "people") && users.length > 0 && (
         <div className="mb-8">
           {tab === "all" && <h2 className="text-sm font-medium text-zinc-400 mb-3 uppercase tracking-wider">People</h2>}
@@ -61,7 +66,7 @@ export default function SearchPage() {
           <div className="space-y-2">
             {users.slice(0, tab === "people" ? 50 : 5).map((u) => (
               <Link key={u.id} href={`/user?u=${u.username}`} className="flex items-center gap-3 p-3.5 bg-white/[0.03] rounded-xl border border-white/[0.04] hover:bg-white/[0.06] transition-all">
-                <img src={u.photo_url || "/default-avatar.png"} alt="" className="w-11 h-11 rounded-xl ring-2 ring-indigo-500/10 object-cover" />
+                <img src={u.photo_url || "/default-avatar.png"} alt="" className="w-11 h-11 rounded-xl ring-2 ring-indigo-500/10 object-cover" loading="lazy" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm text-zinc-100 truncate">{u.display_name}</div>
                   <div className="text-xs text-zinc-500">@{u.username}</div>
@@ -102,7 +107,7 @@ export default function SearchPage() {
         </div>
       )}
 
-      {searched && posts.length === 0 && users.length === 0 && (
+      {searched && !searchLoading && posts.length === 0 && users.length === 0 && (
         <div className="text-center py-20 text-zinc-500"><div className="text-5xl mb-4">🔍</div><p className="text-lg">No results for &ldquo;{searchQuery}&rdquo;</p><p className="text-sm mt-2">Try a different search term</p></div>
       )}
     </div>

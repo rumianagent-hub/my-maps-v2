@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FiShare, FiCheck, FiX, FiLoader, FiSettings } from "react-icons/fi";
 import { useToast } from "@/components/Toast";
+import { SkeletonProfile } from "@/components/Skeleton";
 import Link from "next/link";
 
 export default function ProfilePage() {
-  const { user, profile, loading, updateProfile, checkUsernameAvailable } = useAuth();
+  const { user, profile, ready, loading, updateProfile, checkUsernameAvailable } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -20,7 +21,7 @@ export default function ProfilePage() {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (!loading && !user) router.push("/"); }, [user, loading, router]);
+  useEffect(() => { if (ready && !user) router.push("/"); }, [user, ready, router]);
   useEffect(() => { if (profile) { setUsername(profile.username || ""); setDisplayName(profile.display_name); setBio(profile.bio); } }, [profile]);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function ProfilePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(`${window.location.origin}/user?u=${profile?.username}`); toast("Profile link copied!"); };
 
-  if (loading || !user || !profile) return <div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!ready || loading || !user || !profile) return <SkeletonProfile />;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 animate-fade-in">

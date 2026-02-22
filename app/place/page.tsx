@@ -6,8 +6,21 @@ import { getPlaceDetails } from "@/lib/places";
 import type { PlaceCache } from "@/lib/types";
 import GoogleMapsLoader, { useMapsLoaded } from "@/components/GoogleMapsLoader";
 import PostCard from "@/components/PostCard";
+import { SkeletonPostGrid } from "@/components/Skeleton";
 import { FiMapPin, FiStar, FiPhone, FiClock, FiExternalLink, FiArrowLeft, FiNavigation, FiDollarSign, FiGlobe } from "react-icons/fi";
 import { useSearchParams, useRouter } from "next/navigation";
+
+function PlaceSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto px-4 pt-20 pb-8">
+      <div className="shimmer h-8 w-20 rounded-xl mb-6" />
+      <div className="shimmer h-52 rounded-2xl mb-6" />
+      <div className="shimmer h-10 w-3/4 rounded-lg mb-3" />
+      <div className="shimmer h-4 w-1/2 rounded-lg mb-6" />
+      <SkeletonPostGrid count={3} />
+    </div>
+  );
+}
 
 function PlaceInner() {
   const searchParams = useSearchParams();
@@ -49,7 +62,7 @@ function PlaceInner() {
   const ourRatings = posts.filter((p) => p.rating > 0);
   const communityAvg = ourRatings.length > 0 ? ourRatings.reduce((sum, p) => sum + p.rating, 0) / ourRatings.length : 0;
 
-  if (placeLoading && postsLoading) return <div className="max-w-4xl mx-auto px-4 pt-20 pb-8"><div className="h-64 shimmer rounded-2xl mb-6" /><div className="h-8 w-64 shimmer rounded-lg mb-3" /></div>;
+  if (placeLoading && postsLoading) return <PlaceSkeleton />;
 
   return (
     <div className="max-w-4xl mx-auto px-4 pt-20 pb-8 animate-fade-in">
@@ -57,7 +70,11 @@ function PlaceInner() {
 
       {place && place.photos.length > 0 && (
         <div className="flex gap-3 overflow-x-auto pb-4 mb-6 scrollbar-hide -mx-4 px-4">
-          {place.photos.map((url, i) => <img key={i} src={url} alt={displayName} className="h-52 rounded-2xl object-cover flex-shrink-0 border border-white/[0.06]" />)}
+          {place.photos.map((url, i) => (
+            <div key={i} className="h-52 flex-shrink-0 rounded-2xl overflow-hidden border border-white/[0.06]">
+              <img src={url} alt={displayName} className="h-full w-auto object-cover" loading="lazy" />
+            </div>
+          ))}
         </div>
       )}
 
@@ -114,8 +131,8 @@ function PlaceInner() {
         <p className="text-zinc-500 text-sm mt-1">What people are saying about {displayName}</p>
       </div>
 
-      {postsLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{[1, 2, 3].map((i) => <div key={i} className="h-72 shimmer rounded-2xl" />)}</div>
+      {postsLoading && posts.length === 0 ? (
+        <SkeletonPostGrid count={3} />
       ) : posts.length === 0 ? (
         <div className="text-center py-16 text-zinc-500 bg-[var(--bg-card)] rounded-2xl border border-white/[0.06]"><div className="text-4xl mb-3">📝</div><p>No one has posted about {displayName} yet.</p></div>
       ) : (
@@ -130,5 +147,5 @@ function PlaceContent() {
 }
 
 export default function PlacePage() {
-  return <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><PlaceContent /></Suspense>;
+  return <Suspense fallback={<PlaceSkeleton />}><PlaceContent /></Suspense>;
 }

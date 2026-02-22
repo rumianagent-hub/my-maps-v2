@@ -7,12 +7,26 @@ import { supabase } from "@/lib/supabase";
 import { deletePostPhoto } from "@/lib/storage";
 import { useToast } from "@/components/Toast";
 import PhotoCarousel from "@/components/PhotoCarousel";
+import { SkeletonLine } from "@/components/Skeleton";
 import { FiMapPin, FiStar, FiCalendar, FiArrowLeft, FiShare, FiEdit2, FiTrash2 } from "react-icons/fi";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+
+function PostSkeleton() {
+  return (
+    <div className="max-w-lg mx-auto px-4 pt-20 pb-8">
+      <div className="shimmer h-8 w-20 rounded-xl mb-5" />
+      <div className="shimmer aspect-[4/3] rounded-2xl mb-5" />
+      <div className="shimmer h-8 w-3/4 rounded-lg mb-2" />
+      <div className="shimmer h-4 w-1/2 rounded-lg mb-4" />
+      <div className="shimmer h-4 w-full rounded-lg mb-2" />
+      <div className="shimmer h-4 w-2/3 rounded-lg" />
+    </div>
+  );
+}
 
 function PostContent() {
   const searchParams = useSearchParams();
@@ -21,7 +35,7 @@ function PostContent() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: post, isLoading } = usePost(id);
+  const { data: post, isLoading, isError } = usePost(id);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -35,18 +49,24 @@ function PostContent() {
         try { await deletePostPhoto(url); } catch {}
       }
       await supabase.from("posts").delete().eq("id", post.id);
-      qc.invalidateQueries({ queryKey: ["user-posts"] });
+      qc.invalidateQueries({ queryKey: ["user-posts", user.id] });
       router.push("/profile");
     } catch (err) {
       console.error("Failed to delete post:", err);
-      alert("Failed to delete post.");
+      toast("Failed to delete post");
     } finally { setDeleting(false); }
   };
 
   const handleBack = () => { window.history.length > 1 ? router.back() : router.push("/explore"); };
 
-  if (isLoading) return <div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
-  if (!post) return <div className="flex flex-col items-center justify-center min-h-screen text-zinc-500"><p>Post not found</p><Link href="/" className="text-indigo-400 mt-2">Go home</Link></div>;
+  if (isLoading) return <PostSkeleton />;
+  if (isError || !post) return (
+    <div className="flex flex-col items-center justify-center min-h-screen text-zinc-500">
+      <div className="text-5xl mb-4">📝</div>
+      <p className="text-lg mb-2">Post not found</p>
+      <Link href="/" className="text-indigo-400 hover:text-indigo-300 mt-2">Go home</Link>
+    </div>
+  );
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-20 pb-8 animate-fade-in">
@@ -83,7 +103,7 @@ function PostContent() {
 
       {post.author_name && (
         <Link href={`/user?u=${post.author_username}`} className="flex items-center gap-3 mt-8 p-4 bg-[var(--bg-card)] rounded-2xl border border-white/[0.06] card-hover">
-          <img src={post.author_photo} alt="" className="w-11 h-11 rounded-xl ring-2 ring-indigo-500/20" />
+          <img src={post.author_photo} alt="" className="w-11 h-11 rounded-xl ring-2 ring-indigo-500/20" loading="lazy" />
           <div><div className="font-semibold text-sm text-zinc-100">{post.author_name}</div><div className="text-xs text-zinc-500">@{post.author_username}</div></div>
         </Link>
       )}
@@ -105,5 +125,5 @@ function PostContent() {
 }
 
 export default function PostPage() {
-  return <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><PostContent /></Suspense>;
+  return <Suspense fallback={<PostSkeleton />}><PostContent /></Suspense>;
 }

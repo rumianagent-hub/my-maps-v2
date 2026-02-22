@@ -1,8 +1,76 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import type { PostWithAuthor, UserProfile, PlaceCache } from "./types";
+import { useCallback } from "react";
+
+// ============================================================
+// PREFETCH HELPERS
+// ============================================================
+export function usePrefetch() {
+  const qc = useQueryClient();
+
+  const prefetchPost = useCallback(
+    (id: string) => {
+      qc.prefetchQuery({
+        queryKey: ["post", id],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from("posts_with_author")
+            .select("*")
+            .eq("id", id)
+            .single();
+          if (error) throw error;
+          return data as PostWithAuthor;
+        },
+        staleTime: 2 * 60_000,
+      });
+    },
+    [qc]
+  );
+
+  const prefetchUser = useCallback(
+    (username: string) => {
+      qc.prefetchQuery({
+        queryKey: ["user", username],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from("users")
+            .select("*")
+            .eq("username", username)
+            .single();
+          if (error) throw error;
+          return data as UserProfile;
+        },
+        staleTime: 2 * 60_000,
+      });
+    },
+    [qc]
+  );
+
+  const prefetchPlace = useCallback(
+    (placeId: string) => {
+      qc.prefetchQuery({
+        queryKey: ["place-posts", placeId],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from("posts_with_author")
+            .select("*")
+            .eq("place_id", placeId)
+            .eq("visibility", "public")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return data as PostWithAuthor[];
+        },
+        staleTime: 2 * 60_000,
+      });
+    },
+    [qc]
+  );
+
+  return { prefetchPost, prefetchUser, prefetchPlace };
+}
 
 // ============================================================
 // POSTS
@@ -20,7 +88,7 @@ export function useExplorePosts(page = 0, pageSize = 12) {
       if (error) throw error;
       return data as PostWithAuthor[];
     },
-    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -35,7 +103,7 @@ export function useFeed(page = 0, pageSize = 20) {
       if (error) throw error;
       return data as PostWithAuthor[];
     },
-    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -58,7 +126,6 @@ export function useUserPosts(userId: string | undefined) {
       })) as PostWithAuthor[];
     },
     enabled: !!userId,
-    staleTime: 60_000,
   });
 }
 
@@ -75,7 +142,6 @@ export function usePost(id: string | null) {
       return data as PostWithAuthor;
     },
     enabled: !!id,
-    staleTime: 120_000,
   });
 }
 
@@ -93,7 +159,6 @@ export function usePlacePosts(placeId: string | null) {
       return data as PostWithAuthor[];
     },
     enabled: !!placeId,
-    staleTime: 120_000,
   });
 }
 
@@ -113,12 +178,11 @@ export function useUserByUsername(username: string | null) {
       return data as UserProfile;
     },
     enabled: !!username,
-    staleTime: 120_000,
   });
 }
 
 // ============================================================
-// FOLLOWS
+// FOLLOWS — with optimistic updates
 // ============================================================
 export function useIsFollowing(targetUid: string | undefined, myUid: string | undefined) {
   return useQuery({
@@ -133,7 +197,6 @@ export function useIsFollowing(targetUid: string | undefined, myUid: string | un
       return !!data;
     },
     enabled: !!targetUid && !!myUid && targetUid !== myUid,
-    staleTime: 60_000,
   });
 }
 
@@ -149,10 +212,47 @@ export function useFollowMutation() {
         if (error) throw error;
       }
     },
-    onSuccess: (_, { targetUid }) => {
-      qc.invalidateQueries({ queryKey: ["following"] });
-      qc.invalidateQueries({ queryKey: ["user"] });
-      qc.invalidateQueries({ queryKey: ["profile"] });
+    onMutate: async ({ targetUid, follow }) => {
+      // Optimistic update for follow state
+      const myUid = (await supabase.auth.getUser()).data.user?.id;
+      if (!myUid) return;
+
+      const followKey = ["following", myUid, targetUid];
+      await qc.cancelQueries({ queryKey: followKey });
+      const previousFollowing = qc.getQueryData<boolean>(followKey);
+      qc.setQueryData(followKey, follow);
+
+      // Optimistic update for follower/following counts on user profile
+      const updateCount = (key: string[], field: "follower_count" | "following_count", delta: number) => {
+        qc.setQueriesData<UserProfile>({ queryKey: key }, (old) => {
+          if (!old) return old;
+          return { ...old, [field]: Math.max(0, (old[field] || 0) + delta) };
+        });
+      };
+
+      // Update target user's follower count
+      qc.getQueryCache().findAll({ queryKey: ["user"] }).forEach((query) => {
+        const data = query.state.data as UserProfile | undefined;
+        if (data?.id === targetUid) {
+          qc.setQueryData<UserProfile>(query.queryKey, (old) =>
+            old ? { ...old, follower_count: Math.max(0, (old.follower_count || 0) + (follow ? 1 : -1)) } : old
+          );
+        }
+      });
+
+      return { previousFollowing, followKey };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.followKey && context?.previousFollowing !== undefined) {
+        qc.setQueryData(context.followKey, context.previousFollowing);
+      }
+    },
+    onSettled: (_, __, { targetUid }) => {
+      // Targeted invalidation — only refetch follow-related queries
+      const myUid = qc.getQueryCache().findAll({ queryKey: ["following"] })[0]?.queryKey[1];
+      if (myUid) {
+        qc.invalidateQueries({ queryKey: ["following", myUid, targetUid] });
+      }
       qc.invalidateQueries({ queryKey: ["followers", targetUid] });
     },
   });
@@ -170,7 +270,6 @@ export function useFollowers(uid: string | undefined) {
       return (data || []).map((d: any) => d.users as UserProfile);
     },
     enabled: !!uid,
-    staleTime: 60_000,
   });
 }
 
@@ -186,7 +285,6 @@ export function useFollowing(uid: string | undefined) {
       return (data || []).map((d: any) => d.users as UserProfile);
     },
     enabled: !!uid,
-    staleTime: 60_000,
   });
 }
 
@@ -219,7 +317,6 @@ export function useSearch(query: string) {
       const q = query.toLowerCase().trim().replace(/[%_]/g, "");
       if (!q) return { posts: [] as PostWithAuthor[], users: [] as UserProfile[] };
 
-      // Search posts by text fields
       const textSearch = supabase
         .from("posts")
         .select("*, users(display_name, photo_url, username)")
@@ -228,7 +325,6 @@ export function useSearch(query: string) {
         .order("created_at", { ascending: false })
         .limit(50);
 
-      // Search posts by tag (array contains)
       const tagSearch = supabase
         .from("posts")
         .select("*, users(display_name, photo_url, username)")
@@ -246,12 +342,14 @@ export function useSearch(query: string) {
 
       const [textRes, tagRes, usersRes] = await Promise.all([textSearch, tagSearch, usersSearch]);
 
-      // Merge and deduplicate posts
       const allPosts = [...(textRes.data || []), ...(tagRes.data || [])];
       const seen = new Set<string>();
       const uniquePosts: any[] = [];
       for (const p of allPosts) {
-        if (!seen.has(p.id)) { seen.add(p.id); uniquePosts.push(p); }
+        if (!seen.has(p.id)) {
+          seen.add(p.id);
+          uniquePosts.push(p);
+        }
       }
 
       const posts = uniquePosts.map((p: any) => ({
@@ -268,12 +366,12 @@ export function useSearch(query: string) {
       };
     },
     enabled: query.trim().length >= 2,
-    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
 // ============================================================
-// ALL USERS (for People tab default)
+// ALL USERS
 // ============================================================
 export function useAllUsers() {
   return useQuery({
@@ -288,12 +386,11 @@ export function useAllUsers() {
       if (error) throw error;
       return (data || []) as UserProfile[];
     },
-    staleTime: 120_000,
   });
 }
 
 // ============================================================
-// ALL TAGS (for Tags tab default)
+// ALL TAGS
 // ============================================================
 export function useAllTags() {
   return useQuery({
@@ -311,6 +408,5 @@ export function useAllTags() {
       });
       return [...tagCounts.entries()].sort((a, b) => b[1] - a[1]);
     },
-    staleTime: 120_000,
   });
 }

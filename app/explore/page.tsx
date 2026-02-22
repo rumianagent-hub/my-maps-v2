@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useExplorePosts } from "@/lib/hooks";
 import PostCard from "@/components/PostCard";
+import { SkeletonPostGrid } from "@/components/Skeleton";
 import { FiCompass } from "react-icons/fi";
 
 export default function ExplorePage() {
   const [page, setPage] = useState(0);
-  const { data: posts = [], isLoading } = useExplorePosts(page);
+  const { data: posts = [], isLoading, isError, refetch } = useExplorePosts(page);
+  const showSkeleton = isLoading && posts.length === 0;
 
   return (
     <div className="max-w-4xl mx-auto px-4 pt-24 pb-8 animate-fade-in">
@@ -15,8 +17,14 @@ export default function ExplorePage() {
         <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center"><FiCompass size={20} className="text-indigo-400" /></div>
         <div><h1 className="text-2xl font-bold text-zinc-100">Explore</h1><p className="text-zinc-500 text-sm">Discover restaurants from the community</p></div>
       </div>
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-72 shimmer rounded-2xl" />)}</div>
+      {isError ? (
+        <div className="text-center py-24 text-zinc-500">
+          <div className="text-5xl mb-4">⚠️</div>
+          <p className="text-lg mb-4">Failed to load posts</p>
+          <button onClick={() => refetch()} className="text-indigo-400 hover:text-indigo-300 font-medium">Try again →</button>
+        </div>
+      ) : showSkeleton ? (
+        <SkeletonPostGrid count={6} />
       ) : posts.length === 0 ? (
         <div className="text-center py-24 text-zinc-500"><div className="text-5xl mb-4">🍽️</div><p className="text-lg">No posts yet. Be the first to share!</p></div>
       ) : (

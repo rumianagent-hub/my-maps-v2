@@ -4,9 +4,10 @@ import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FiMap, FiCompass, FiHome, FiLogOut, FiLogIn, FiSearch, FiEdit } from "react-icons/fi";
+import { SkeletonAvatar } from "./Skeleton";
 
 export default function Navbar() {
-  const { user, profile, signInWithGoogle, logout } = useAuth();
+  const { user, profile, ready, signInWithGoogle, logout } = useAuth();
   const pathname = usePathname();
 
   if (pathname === "/setup") return null;
@@ -14,10 +15,12 @@ export default function Navbar() {
   const navLink = (href: string, icon: React.ReactNode, label: string) => {
     const active = pathname === href;
     return (
-      <Link href={href}
+      <Link
+        href={href}
         className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
           active ? "bg-indigo-500/10 text-indigo-400" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-        }`}>
+        }`}
+      >
         {icon}<span className="hidden sm:inline">{label}</span>
       </Link>
     );
@@ -33,7 +36,12 @@ export default function Navbar() {
           <span className="gradient-text font-bold text-lg tracking-tight">MyMaps</span>
         </Link>
         <div className="flex items-center gap-1">
-          {user && profile?.onboarded ? (
+          {/* Not ready yet — show nothing to prevent flash */}
+          {!ready ? (
+            <div className="flex items-center gap-2">
+              <SkeletonAvatar size="sm" />
+            </div>
+          ) : user && profile?.onboarded ? (
             <>
               {navLink("/", <FiHome size={16} />, "Home")}
               {navLink("/explore", <FiCompass size={16} />, "Explore")}
@@ -43,7 +51,11 @@ export default function Navbar() {
               </Link>
               <Link href="/profile" className="ml-3">
                 {profile?.photo_url ? (
-                  <img src={profile.photo_url} alt="" className="w-9 h-9 rounded-full ring-2 ring-indigo-500/30 hover:ring-indigo-500/60 transition-all" />
+                  <img
+                    src={profile.photo_url}
+                    alt=""
+                    className="w-9 h-9 rounded-full ring-2 ring-indigo-500/30 hover:ring-indigo-500/60 transition-all"
+                  />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm font-bold">
                     {profile?.display_name?.[0] || "?"}
@@ -55,8 +67,10 @@ export default function Navbar() {
               </button>
             </>
           ) : !user ? (
-            <button onClick={signInWithGoogle}
-              className="flex items-center gap-2 bg-white text-zinc-900 px-5 py-2 rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5">
+            <button
+              onClick={signInWithGoogle}
+              className="flex items-center gap-2 bg-white text-zinc-900 px-5 py-2 rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5"
+            >
               <FiLogIn size={16} />Sign In
             </button>
           ) : null}

@@ -5,6 +5,8 @@ import { AuthProvider } from "@/lib/auth-context";
 import { QueryProvider } from "@/lib/query-provider";
 import Navbar from "@/components/Navbar";
 import { ToastProvider } from "@/components/Toast";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,14 +28,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} antialiased grain`}>
-        <QueryProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <Navbar />
-              <main className="min-h-screen">{children}</main>
-            </ToastProvider>
-          </AuthProvider>
-        </QueryProvider>
+        <ErrorBoundary>
+          <QueryProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <Suspense>
+                  <Navbar />
+                </Suspense>
+                <main className="min-h-screen">
+                  <ErrorBoundary>
+                    <Suspense>{children}</Suspense>
+                  </ErrorBoundary>
+                </main>
+              </ToastProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
