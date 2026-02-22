@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { UserProfile } from "./types";
 import { useRouter, usePathname } from "next/navigation";
@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
-  ready: boolean; // true once initial session check is done — use this to decide what to render
+  ready: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithIdToken: (params: { provider: "google"; token: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,102 +24,108 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [ready, setReady] = useState(false); // initial session resolved
-  const [loading, setLoading] = useState(true); // profile still loading
-  const initialEventFired = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const mountedRef = useRef(true);
+  const profileRetries = useRef(0);
 
   const loadProfile = useCallback(async (u: User): Promise<UserProfile | null> => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", u.id)
-      .maybeSingle();
-    if (error) {
-      console.error("Failed to load profile:", error);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", u.id)
+        .maybeSingle();
+      if (error) {
+        console.error("Failed to load profile:", error);
+        return null;
+      }
+      return data as UserProfile | null;
+    } catch (e) {
+      console.error("Profile load exception:", e);
       return null;
     }
-    return data as UserProfile | null;
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     const p = await loadProfile(user);
-    if (p) setProfile(p);
+    if (p && mountedRef.current) setProfile(p);
   }, [user, loadProfile]);
 
+  // Core auth initialization — get session once, then listen for changes
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
+    const init = async () => {
+      // 1. Get current session directly (more reliable than waiting for event)
+      const { data: { session } } = await supabase.auth.getSession();
+      const u = session?.user ?? null;
 
-        const u = session?.user ?? null;
+      if (!mountedRef.current) return;
+      setUser(u);
 
-        if (event === "INITIAL_SESSION") {
-          // First event — resolve initial auth state
-          initialEventFired.current = true;
-          setUser(u);
-          if (u) {
-            const p = await loadProfile(u);
-            if (mounted) setProfile(p);
-          } else {
-            setProfile(null);
+      if (u) {
+        const p = await loadProfile(u);
+        if (mountedRef.current) {
+          setProfile(p);
+          // If profile is null, retry up to 2 times
+          if (!p && profileRetries.current < 2) {
+            profileRetries.current++;
+            setTimeout(async () => {
+              if (!mountedRef.current) return;
+              const retry = await loadProfile(u);
+              if (retry && mountedRef.current) setProfile(retry);
+            }, 1500);
           }
-          if (mounted) {
-            setReady(true);
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (event === "TOKEN_REFRESHED") {
-          // Just update user object silently — don't flash UI
-          setUser(u);
-          return;
-        }
-
-        if (event === "SIGNED_IN") {
-          // Only handle if this is a NEW sign-in (not the initial session replay)
-          setUser(u);
-          if (u) {
-            setLoading(true);
-            const p = await loadProfile(u);
-            if (mounted) {
-              setProfile(p);
-              setLoading(false);
-            }
-          }
-          return;
-        }
-
-        if (event === "SIGNED_OUT") {
-          setUser(null);
-          setProfile(null);
-          return;
         }
       }
-    );
 
-    // Safety timeout — if Supabase never fires INITIAL_SESSION
-    const timeout = setTimeout(() => {
-      if (mounted && !initialEventFired.current) {
-        console.warn("Auth timed out, proceeding without session");
+      if (mountedRef.current) {
         setReady(true);
         setLoading(false);
       }
-    }, 3000);
+
+      // 2. Listen for auth changes AFTER initial state is set
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mountedRef.current) return;
+          const newUser = session?.user ?? null;
+
+          if (event === "SIGNED_IN") {
+            setUser(newUser);
+            if (newUser) {
+              setLoading(true);
+              const p = await loadProfile(newUser);
+              if (mountedRef.current) {
+                setProfile(p);
+                setLoading(false);
+              }
+            }
+          } else if (event === "SIGNED_OUT") {
+            setUser(null);
+            setProfile(null);
+          } else if (event === "TOKEN_REFRESHED") {
+            setUser(newUser);
+          }
+          // Ignore INITIAL_SESSION since we already handled it above
+        }
+      );
+      sub = subscription;
+    };
+
+    init();
 
     return () => {
-      mounted = false;
-      clearTimeout(timeout);
-      subscription.unsubscribe();
+      mountedRef.current = false;
+      sub?.unsubscribe();
     };
   }, [loadProfile]);
 
-  // Redirect to setup if not onboarded — only when ready
+  // Redirect to setup if not onboarded
   useEffect(() => {
     if (!ready) return;
     if (user && profile && !profile.onboarded && pathname !== "/setup") {
@@ -130,23 +136,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}`,
-      },
+      options: { redirectTo: window.location.origin },
     });
     if (error) console.error("Sign-in failed:", error);
   };
 
   const signInWithIdToken = async ({ provider, token }: { provider: "google"; token: string }) => {
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider,
-      token,
-    });
+    const { error } = await supabase.auth.signInWithIdToken({ provider, token });
     if (error) console.error("ID token sign-in failed:", error);
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
+    setUser(null);
     setProfile(null);
     router.push("/");
   };
@@ -154,10 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user) return;
     const updated = { ...data, updated_at: new Date().toISOString() };
-    const { error } = await supabase
-      .from("users")
-      .update(updated)
-      .eq("id", user.id);
+    const { error } = await supabase.from("users").update(updated).eq("id", user.id);
     if (error) {
       console.error("Failed to update profile:", error);
       throw error;
@@ -176,20 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        loading,
-        ready,
-        signInWithGoogle,
-        signInWithIdToken,
-        logout,
-        updateProfile,
-        checkUsernameAvailable,
-        refreshProfile,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, profile, loading, ready, signInWithGoogle, signInWithIdToken,
+      logout, updateProfile, checkUsernameAvailable, refreshProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   );
