@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "MyMaps",
+    "slug": "mymaps",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "mymaps",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#09090b"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rumianagent.mymaps",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MyMaps uses your location to show nearby restaurants.",
+        "NSPhotoLibraryUsageDescription": "MyMaps needs photo access to upload restaurant photos.",
+        "NSCameraUsageDescription": "MyMaps needs camera access to take restaurant photos."
+      }
+    },
+    "android": {
+      "package": "com.rumianagent.mymaps",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#09090b"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "MyMaps uses your location to show nearby restaurants." }
+      ],
+      [
+        "expo-image-picker",
+        { "photosPermission": "MyMaps needs photo access to upload restaurant photos.", "cameraPermission": "MyMaps needs camera access to take restaurant photos." }
+      ]
+    ]
+  }
+}
