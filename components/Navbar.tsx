@@ -41,14 +41,18 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <SkeletonAvatar size="sm" />
             </div>
-          ) : user && profile?.onboarded ? (
+          ) : user ? (
             <>
-              {navLink("/", <FiHome size={16} />, "Home")}
-              {navLink("/explore", <FiCompass size={16} />, "Explore")}
-              {navLink("/search", <FiSearch size={16} />, "Search")}
-              <Link href="/add" className="flex items-center gap-1.5 btn-primary px-4 py-2 text-sm ml-2">
-                <FiEdit size={15} /><span className="hidden sm:inline">Post</span>
-              </Link>
+              {profile?.onboarded && (
+                <>
+                  {navLink("/", <FiHome size={16} />, "Home")}
+                  {navLink("/explore", <FiCompass size={16} />, "Explore")}
+                  {navLink("/search", <FiSearch size={16} />, "Search")}
+                  <Link href="/add" className="flex items-center gap-1.5 btn-primary px-4 py-2 text-sm ml-2">
+                    <FiEdit size={15} /><span className="hidden sm:inline">Post</span>
+                  </Link>
+                </>
+              )}
               <Link href="/profile" className="ml-3">
                 {profile?.photo_url ? (
                   <img
@@ -62,18 +66,18 @@ export default function Navbar() {
                   </div>
                 )}
               </Link>
-              <button onClick={logout} className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors ml-1">
-                <FiLogOut size={16} />
+              <button onClick={logout} className="p-2.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all ml-1">
+                <FiLogOut size={18} />
               </button>
             </>
-          ) : !user ? (
+          ) : (
             <button
               onClick={signInWithGoogle}
               className="flex items-center gap-2 bg-white text-zinc-900 px-5 py-2 rounded-xl text-sm font-medium hover:bg-zinc-100 transition-all shadow-lg shadow-white/5"
             >
               <FiLogIn size={16} />Sign In
             </button>
-          ) : null}
+          )}
         </div>
       </div>
     </nav>
