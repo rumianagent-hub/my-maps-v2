@@ -98,10 +98,20 @@ function LandingExploreContent() {
 }
 
 export default function Home() {
-  const { user, profile, ready } = useAuth();
+  const { user, profile, ready, loading } = useAuth();
 
-  // Show landing page shell immediately — don't block on auth
-  if (!ready) {
+  // Still resolving auth — show skeleton feed if we suspect user is signed in
+  // (e.g. returning visitor), otherwise show landing page
+  if (!ready || loading) {
+    // Check if there's a supabase session hint in localStorage
+    const hasSession = typeof window !== "undefined" && 
+      localStorage.getItem("sb-nsytfuyxqicrrxinxtkw-auth-token");
+    
+    if (hasSession) {
+      // Show the feed skeleton while auth resolves
+      return <HomeFeed />;
+    }
+    
     return (
       <div className="min-h-screen flex flex-col">
         <LandingHero signIn={() => {}} />
@@ -110,10 +120,17 @@ export default function Home() {
     );
   }
 
+  // Auth resolved — user is signed in with profile
   if (user && profile?.onboarded) {
     return <HomeFeed />;
   }
 
+  // Auth resolved — user signed in but profile not loaded yet (give it a moment)
+  if (user && !profile) {
+    return <HomeFeed />;
+  }
+
+  // Not signed in
   return (
     <div className="min-h-screen flex flex-col">
       <LandingHero signIn={undefined} />
